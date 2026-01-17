@@ -4,116 +4,114 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VirtuLease | Dashboard</title>
-    <style>
-        :root {
-            --primary: #2c3e50;
-            --accent: #3498db;
-            --bg: #f8f9fa;
-            --white: #ffffff;
-            --text: #333;
-            --success: #27ae60;
-            --danger: #e74c3c;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            display: flex;
-            background-color: var(--bg);
-            color: var(--text);
-        }
-
-        /* Sidebar */
-        nav {
-            width: 250px;
-            height: 100vh;
-            background: var(--primary);
-            color: var(--white);
-            position: fixed;
-            display: flex;
-            flex-direction: column;
-            padding: 20px 0;
-        }
-
-        nav h1 {
-            text-align: center;
-            font-size: 1.5rem;
-            margin-bottom: 2rem;
-            color: var(--accent);
-        }
-
-        nav a {
-            color: #bdc3c7;
-            text-decoration: none;
-            padding: 15px 25px;
-            display: block;
-            transition: 0.3s;
-        }
-
-        nav a:hover, nav a.active {
-            background: #34495e;
-            color: var(--white);
-            border-left: 4px solid var(--accent);
-        }
-
-        /* Main Content */
-        main {
-            margin-left: 250px;
-            width: calc(100% - 250px);
-            padding: 30px;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        /* Stat Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-
-        .card {
-            background: var(--white);
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        }
-
-        .card h3 {
-            margin: 0;
-            font-size: 0.9rem;
-            color: #7f8c8d;
-            text-transform: uppercase;
-        }
-
-        .card p {
-            margin: 10px 0 0;
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: var(--primary);
-        }
-
-        button.logout {
-            background: var(--danger);
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: auto;
-            margin-left: 20px;
-            margin-right: 20px;
-        }
-    </style>
 </head>
+<link rel="stylesheet" href="css/style.css">
 <body>
 
-    <nav>
-        <h1>VirtuLease</h1>
-        <a href="dashboard.html" class="active">Dashboard</a>
+<nav>
+    <h1>VirtuLease</h1>
+    <a href="dashboard.html" id="nav-dash">Dashboard</a>
+    <a href="houses.html" id="nav-houses">Houses / Rooms</a>
+    <a href="tenants.html" id="nav-tenants">Tenants</a>
+        <a href="reports.html">Reports</a>
+        <a href="payments.html" id="nav-payments">Payments</a> 
+        <a href="notifications.html">Notifications</a>
+        <a href="profile.html">Profile</a>
+
+
+        <button class="logout" onclick="logout()">Logout</button>
+
+</nav>
+
+    <main>
+        <div class="header">
+            <h2>Landlord Dashboard</h2>
+            <p id="current-date"></p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="card">
+                <h3>Total Houses</h3>
+                <p id="stat-houses">0</p>
+            </div>
+            <div class="card">
+                <h3>Total Rooms</h3>
+                <p id="stat-rooms">0</p>
+            </div>
+            <div class="card">
+                <h3>Occupied</h3>
+                <p id="stat-occupied" style="color: var(--success)">0</p>
+            </div>
+            <!-- <h3>Rent Expiring Soon (30 Days)</h3>
+    <table style="margin-top: 15px;">
+        <thead>
+            <tr>
+                <th>Tenant</th>
+                <th>Room</th>
+                <th>Expiry Date</th>
+            </tr>
+        </thead>
+        <tbody id="expiryList">
+            </tbody>
+    </table> -->
+            <div class="card">
+                <h3>Vacant</h3>
+                <p id="stat-vacant" style="color: var(--danger)">0</p>
+            </div>
+            <div class="card">
+    <h3>Revenue (Current Month)</h3>
+    <p id="stat-revenue" style="color: var(--accent)">₦0</p>
+</div>
+        </div>
+    </main>
+
+    <script>
+        document.getElementById('current-date').innerText = new Date().toDateString();
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/dashboard/stats');
+                
+                if (response.status === 401) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                const data = await response.json();
+                
+                // Update UI
+                document.getElementById('stat-houses').innerText = data.totalHouses || 0;
+                document.getElementById('stat-rooms').innerText = data.totalRooms || 0;
+                document.getElementById('stat-occupied').innerText = data.occupiedRooms || 0;
+                document.getElementById('stat-vacant').innerText = data.vacantRooms || 0;
+                document.getElementById('stat-revenue').innerText = `₦${parseFloat(data.monthlyRevenue).toLocaleString()}`;
+
+            } catch (err) {
+                console.error("Load Error:", err);
+            }
+            const expiryList = document.getElementById('expiryList');
+if (data.expiringLeases.length === 0) {
+    expiryList.innerHTML = '<tr><td colspan="3" style="text-align:center;">No upcoming expirations</td></tr>';
+} else {
+    expiryList.innerHTML = data.expiringLeases.map(l => `
+        <tr>
+            <td>${l.full_name}</td>
+            <td>${l.room_number}</td>
+            <td style="color: var(--danger); font-weight: bold;">
+                ${new Date(l.end_date).toLocaleDateString()}
+            </td>
+        </tr>
+    `).join('');
+}
+        }
+
+        function logout() {
+            document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.href = 'login.html';
+        }
+
+        // Run on load
+        loadStats();
+    </script>
+</body>
+</html>

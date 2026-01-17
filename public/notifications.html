@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VirtuLease | Automated Notifications</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .channel-badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; background: #e0e0e0; margin-right: 5px; }
+        .success-msg { color: var(--success); font-weight: bold; margin-top: 15px; display: none; }
+    </style>
+</head>
+<body>
+    <nav>
+        <h1>VirtuLease</h1>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="houses.html">Houses / Rooms</a>
+        <a href="tenants.html">Tenants</a>
+        <a href="payments.html">Payments</a>
+        <a href="reports.html">Reports</a>
+        <a href="notifications.html" class="active">Notifications</a>
+        <button class="logout" onclick="logout()">Logout</button>
+    </nav>
+    <main>
+        <div class="header">
+            <h2>Occupant Notifications</h2>
+            <button class="primary" onclick="triggerReminders()">🚀 Broadcast Reminders</button>
+        </div>
+
+        <div id="msg" class="card success-msg">Broadcast completed successfully!</div>
+
+        <div class="card">
+            <h3>Upcoming Expirations (Next 7 Days)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Occupant</th>
+                        <th>Location</th>
+                        <th>Expiry Date</th>
+                        <th>Contact Channels</th>
+                    </tr>
+                </thead>
+                <tbody id="expiryTable"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        async function loadExpirations() {
+            const res = await fetch('/api/tenants/active-list');
+            const data = await res.json();
+            const now = new Date();
+            const nextWeek = new Date();
+            nextWeek.setDate(now.getDate() + 7);
+
+            const upcoming = data.filter(t => {
+                const expiry = new Date(t.end_date);
+                return expiry >= now && expiry <= nextWeek;
+            });
+
+            const body = document.getElementById('expiryTable');
+            body.innerHTML = upcoming.map(u => `
+                <tr>
+                    <td>${u.full_name}</td>
+                    <td>${u.house_name} - ${u.room_number}</td>
+                    <td>${new Date(u.end_date).toLocaleDateString()}</td>
+                    <td>
+                        ${u.phone ? '<span class="channel-badge">SMS</span>' : ''}
+                        ${u.email ? '<span class="channel-badge">Email</span>' : ''}
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="4" style="text-align:center;">No occupants expiring in the next 7 days.</td></tr>';
+        }
+
+        async function triggerReminders() {
+            if (!confirm("This will send SMS and Email alerts to all occupants expiring in 3 days. Proceed?")) return;
+            
+            const res = await fetch('/api/notifications/send-reminders', { method: 'POST' });
+            if (res.ok) {
+                document.getElementById('msg').style.display = 'block';
+                setTimeout(() => document.getElementById('msg').style.display = 'none', 5000);
+            }
+        }
+
+        window.onload = loadExpirations;
+        function logout() { document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; window.location.href = 'login.html'; }
+    </script>
+</body>
+</html>

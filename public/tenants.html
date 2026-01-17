@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VirtuLease | Tenant Directory</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .hidden { display: none; }
+        .tab-btn { padding: 10px 20px; cursor: pointer; border: none; background: #eee; border-radius: 5px 5px 0 0; }
+        .tab-btn.active { background: var(--accent); color: white; font-weight: bold; }
+        .btn-checkout { background: var(--danger); color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; border:none; }
+    </style>
+</head>
+<body>
+    <nav>
+        <h1>VirtuLease</h1>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="houses.html">Houses / Rooms</a>
+        <a href="tenants.html" class="active">Tenants</a>
+        <a href="reports.html">Reports</a>
+        <a href="payments.html">Payments</a>
+        <a href="notifications.html">Notifications</a>
+        <a href="profile.html">Profile</a>
+
+        <button class="logout" onclick="logout()">Logout</button>
+    </nav>
+
+    <main>
+        <div class="header">
+            <h2>Occupancy Management</h2>
+            <button class="primary" onclick="toggleCheckIn()">+ New Check-in</button>
+        </div>
+
+        <div id="checkInCard" class="card hidden">
+            <h3>New Occupant Registration</h3>
+            <form id="checkInForm">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div><label>Full Name</label><input type="text" id="tName" required></div>
+                    <div><label>Phone Number</label><input type="text" id="tPhone" required></div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <label>Building</label>
+                        <select id="hSelect" onchange="updateRoomOptions(this.value)" required>
+                            <option value="">-- Select House --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Available Room</label>
+                        <select id="rSelect" required disabled>
+                            <option value="">-- Select House First --</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div><label>Lease Start</label><input type="date" id="sDate" required></div>
+                    <div><label>Lease End</label><input type="date" id="eDate" required></div>
+                </div>
+                <div style="margin-top:20px; display: flex; gap: 10px;">
+                    <button type="submit" class="success">Confirm Check-in</button>
+                    <button type="button" onclick="toggleCheckIn()" style="background:#95a5a6; color:white;">Cancel</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; gap: 5px;">
+                <button class="tab-btn active" id="btnActive" onclick="switchTab('active')">Active Occupants</button>
+                <button class="tab-btn" id="btnHistory" onclick="switchTab('history')">History</button>
+            </div>
+            
+            <div style="border: 1px solid #ddd; padding: 20px; border-radius: 0 5px 5px 5px; background: white;">
+                <input type="text" id="tenantSearch" placeholder="🔍 Search by name or room..." onkeyup="filterTenants()" 
+                       style="width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 5px;">
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Contact</th>
+                            <th>Location</th>
+                            <th>Room No.</th>
+                            <th id="dateHeader">Lease Ends</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tenantTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentTab = 'active';
+        let allTenants = [];
+
+        async function fetchList() {
+            const url = currentTab === 'active' ? '/api/tenants/active-list' : '/api/tenants/history';
+            const res = await fetch(url);
+            allTenants = await res.json();
+            document.getElementById('dateHeader').innerText = currentTab === 'active' ? 'Lease Ends' : 'Checked Out';
+            renderTable(allTenants);
+        }
+
+        function renderTable(data) {
+            const body = document.getElementById('tenantTableBody');
+            if (data.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No records found.</td></tr>';
+                return;
+            }
+            body.innerHTML = data.map(t => `
+                <tr>
+                    <td>${t.full_name}</td>
+                    <td>${t.phone}</td>
+                    <td>${t.house_name}</td>
+                    <td>${t.room_number}</td>
+                    <td>${new Date(currentTab === 'active' ? t.end_date : t.checkout_date).toLocaleDateString()}</td>
+                    <td>
+                        ${currentTab === 'active' 
+                            ? `<button class="btn-checkout" onclick="checkOut(${t.lease_id}, ${t.room_id})">Check-out</button>` 
+                            : `<span style="color:#7f8c8d;">Checked Out</span>`}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('checkInForm').onsubmit = async (e) => {
+            e.preventDefault(); // This prevents the redirect/refresh
+            
+            const payload = {
+                full_name: document.getElementById('tName').value,
+                phone: document.getElementById('tPhone').value,
+                room_id: document.getElementById('rSelect').value,
+                start_date: document.getElementById('sDate').value,
+                end_date: document.getElementById('eDate').value
+            };
+
+            try {
+                const res = await fetch('/api/tenants/assign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    alert("Occupant registered successfully.");
+                    document.getElementById('checkInForm').reset();
+                    toggleCheckIn();
+                    fetchList(); // Reload the list to show the new person
+                } else {
+                    const error = await res.json();
+                    alert("Error: " + error.error);
+                }
+            } catch (err) {
+                console.error("Check-in error:", err);
+                alert("Critical failure during check-in.");
+            }
+        };
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('btnActive').classList.toggle('active', tab === 'active');
+            document.getElementById('btnHistory').classList.toggle('active', tab === 'history');
+            fetchList();
+        }
+
+        async function checkOut(leaseId, roomId) {
+            if (!confirm("Confirm Check-out?")) return;
+            const res = await fetch('/api/tenants/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lease_id: leaseId, room_id: roomId })
+            });
+            if (res.ok) fetchList();
+        }
+
+        function filterTenants() {
+            const term = document.getElementById('tenantSearch').value.toLowerCase();
+            const filtered = allTenants.filter(t => t.full_name.toLowerCase().includes(term) || t.room_number.toLowerCase().includes(term));
+            renderTable(filtered);
+        }
+
+        async function updateRoomOptions(houseId) {
+            const rSelect = document.getElementById('rSelect');
+            if (!houseId) { rSelect.disabled = true; return; }
+            const res = await fetch(`/api/rooms/${houseId}`);
+            const rooms = await res.json();
+            const vacant = rooms.filter(r => r.status === 'vacant');
+            rSelect.innerHTML = '<option value="">-- Choose Room --</option>' + 
+                vacant.map(r => `<option value="${r.id}">${r.room_number}</option>`).join('');
+            rSelect.disabled = false;
+        }
+
+        async function loadInitialData() {
+            const hRes = await fetch('/api/houses');
+            const houses = await hRes.json();
+            document.getElementById('hSelect').innerHTML = '<option value="">-- Select House --</option>' + 
+                houses.map(h => `<option value="${h.id}">${h.name}</option>`).join('');
+            fetchList();
+        }
+
+        function toggleCheckIn() { document.getElementById('checkInCard').classList.toggle('hidden'); }
+        function logout() { document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; window.location.href = 'login.html'; }
+        window.onload = loadInitialData;
+    </script>
+</body>
+</html>

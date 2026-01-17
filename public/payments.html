@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VirtuLease | Payments & Receipts</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .receipt-btn { background: var(--accent); color: white; padding: 5px 10px; border-radius: 4px; border: none; cursor: pointer; }
+        .success-banner { background: var(--success); color: white; padding: 10px; margin-bottom: 20px; border-radius: 5px; display: none; }
+    </style>
+</head>
+<body>
+    <nav>
+        <h1>VirtuLease</h1>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="houses.html">Houses / Rooms</a>
+        <a href="tenants.html">Tenants</a>
+        <a href="reports.html">Reports</a>
+        <a href="payments.html" class="active">Payments</a>
+        <a href="notifications.html">Notifications</a>
+
+        <a href="profile.html">Profile</a>
+
+        <button class="logout" onclick="logout()">Logout</button>
+    </nav>
+    <main>
+        <div class="header">
+            <h2>Financial Transactions</h2>
+            <button class="primary" onclick="exportToCSV()">Download Report (CSV)</button>
+        </div>
+
+        <div id="statusMsg" class="success-banner">Payment Recorded Successfully!</div>
+
+        <div class="card">
+            <h3>Record New Payment</h3>
+            <form id="paymentForm" style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: end;">
+                <div>
+                    <label>Occupant (Active Lease)</label>
+                    <select id="leaseSelect" required style="margin:0;"></select>
+                </div>
+                <div>
+                    <label>Amount (₦)</label>
+                    <input type="number" id="amount" placeholder="0.00" required style="margin:0;">
+                </div>
+                <div>
+                    <label>Method</label>
+                    <select id="method" style="margin:0;">
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Cash">Cash</option>
+                        <option value="POS">POS</option>
+                    </select>
+                </div>
+                <button type="submit" class="success">Record Payment</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>Payment History</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Occupant</th>
+                        <th>Building - Room</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="paymentList"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        async function loadLeases() {
+            const res = await fetch('/api/tenants/active-leases');
+            const data = await res.json();
+            const select = document.getElementById('leaseSelect');
+            select.innerHTML = '<option value="">-- Choose Occupant --</option>' + 
+                data.map(l => `<option value="${l.id}" data-name="${l.full_name}" data-loc="${l.house_name} - ${l.room_number}">
+                    ${l.full_name} (${l.house_name} - ${l.room_number})
+                </option>`).join('');
+        }
+
+        async function fetchPayments() {
+            const res = await fetch('/api/payments');
+            const data = await res.json();
+            const list = document.getElementById('paymentList');
+            list.innerHTML = data.map(p => `
+                <tr>
+                    <td>${new Date(p.payment_date).toLocaleDateString()}</td>
+                    <td>${p.full_name}</td>
+                    <td>${p.house_name} - ${p.room_number}</td>
+                    <td>₦${parseFloat(p.amount_paid).toLocaleString()}</td>
+                    <td>${p.payment_method}</td>
+                    <td>
+                        <button class="receipt-btn" onclick="generateReceipt('${p.full_name}', '${p.amount_paid}', '${p.house_name} - ${p.room_number}', '${p.payment_date}', '${p.reference_no}')">Print Receipt</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('paymentForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const data = {
+                lease_id: document.getElementById('leaseSelect').value,
+                amount: document.getElementById('amount').value,
+                method: document.getElementById('method').value,
+                reference: 'VLEASE-' + Date.now()
+            };
+
+            const res = await fetch('/api/payments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                document.getElementById('statusMsg').style.display = 'block';
+                document.getElementById('paymentForm').reset();
+                setTimeout(() => document.getElementById('statusMsg').style.display = 'none', 3000);
+                fetchPayments();
+            }
+        };
+
+        function generateReceipt(name, amount, loc, date, ref) {
+            const receiptWindow = window.open('', '_blank', 'width=600,height=600');
+            receiptWindow.document.write(`
+                <html>
+                <head><title>Payment Receipt</title><style>body{font-family:sans-serif;padding:40px;text-align:center;} .box{border:2px solid #333;padding:20px;} h1{color:#2c3e50;} table{width:100%;margin-top:20px;text-align:left;}</style></head>
+                <body>
+                    <div class="box">
+                        <h1>Mountroyal Official Receipt</h1>
+                        <p>Ref No: ${ref}</p><hr>
+                        <table>
+                            <tr><td><strong>Date:</strong></td><td>${new Date(date).toDateString()}</td></tr>
+                            <tr><td><strong>Received From:</strong></td><td>${name}</td></tr>
+                            <tr><td><strong>Description:</strong></td><td>Rent for ${loc}</td></tr>
+                            <tr><td><strong>Amount:</strong></td><td>₦${parseFloat(amount).toLocaleString()}</td></tr>
+                        </table>
+                        <br><br><br>
+                        <p>____________________<br>Staff Signature</p>
+                    </div>
+                </body>
+                </html>
+            `);
+            receiptWindow.document.close();
+            receiptWindow.print();
+        }
+
+        function exportToCSV() {
+            let csv = 'Date,Occupant,Location,Amount,Method\n';
+            const rows = document.querySelectorAll('#paymentList tr');
+            rows.forEach(row => {
+                const cols = row.querySelectorAll('td');
+                csv += Array.from(cols).slice(0, 5).map(c => `"${c.innerText}"`).join(',') + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'VirtuLease_Payments.csv');
+            a.click();
+        }
+
+        window.onload = () => { loadLeases(); fetchPayments(); };
+        function logout() { document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; window.location.href = 'login.html'; }
+    </script>
+</body>
+</html>

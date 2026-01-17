@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VirtuLease | Financial Reports</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .progress-container { background: #eee; border-radius: 10px; height: 30px; margin: 20px 0; overflow: hidden; border: 1px solid #ddd; }
+        .progress-bar { background: var(--success); height: 100%; width: 0%; transition: width 1s ease-in-out; }
+        .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .summary-card { text-align: center; }
+        .summary-card h2 { font-size: 2.5rem; margin: 10px 0; color: var(--primary); }
+    </style>
+</head>
+<body>
+    <nav>
+        <h1>VirtuLease</h1>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="houses.html">Houses / Rooms</a>
+        <a href="tenants.html">Tenants</a>
+        <a href="reports.html" class="active">Reports</a>
+        <a href="payments.html">Payments</a>
+        <a href="notifications.html">Notifications</a>
+
+        <a href="profile.html">Profile</a>
+
+        <button class="logout" onclick="logout()">Logout</button>
+    </nav>
+    <main>
+        <div class="header">
+            <h2>Financial Performance</h2>
+            <h3 id="currentMonth">--</h3>
+        </div>
+
+        <div class="card">
+            <h3>Monthly Collection Efficiency</h3>
+            <div class="progress-container">
+                <div id="efficiencyBar" class="progress-bar"></div>
+            </div>
+            <p id="efficiencyText" style="font-weight: bold; text-align: center;">Calculating...</p>
+        </div>
+
+        <div class="report-grid">
+            <div class="card summary-card">
+                <h3>Total Potential Revenue</h3>
+                <h2 id="expectedVal">₦0</h2>
+                <small>Sum of rent for occupied rooms</small>
+            </div>
+            <div class="card summary-card">
+                <h3>Actual Revenue Collected</h3>
+                <h2 id="collectedVal" style="color: var(--success);">₦0</h2>
+                <small>Payments recorded this month</small>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px;">
+    <h3>Monthly Payment Defaulters</h3>
+    <p><small>Occupants who have not made a payment in the current month.</small></p>
+    <table>
+        <thead>
+            <tr>
+                <th>Occupant Name</th>
+                <th>Building - Room</th>
+                <th>Monthly Rent Due</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="defaulterList">
+            </tbody>
+    </table>
+</div>
+
+<script>
+    // Update your existing loadReport function to include this:
+    async function loadReport() {
+        try {
+            const res = await fetch('/api/reports/monthly-summary');
+            const data = await res.json();
+
+            // ... (keep your existing progress bar and summary code) ...
+
+            // Render Defaulters
+            const dList = document.getElementById('defaulterList');
+            if (data.defaulters.length === 0) {
+                dList.innerHTML = '<tr><td colspan="4" style="text-align:center;">All active occupants have paid this month.</td></tr>';
+            } else {
+                dList.innerHTML = data.defaulters.map(d => `
+                    <tr>
+                        <td>${d.full_name}</td>
+                        <td>${d.house_name} - ${d.room_number}</td>
+                        <td>₦${parseFloat(d.base_rent).toLocaleString()}</td>
+                        <td><span style="color:var(--danger); font-weight:bold;">PENDING</span></td>
+                    </tr>
+                `).join('');
+            }
+        } catch (err) { console.error(err); }
+    }
+</script>
+    </main>
+
+    <script>
+        async function loadReport() {
+            try {
+                const res = await fetch('/api/reports/monthly-summary');
+                const data = await res.json();
+
+                document.getElementById('currentMonth').innerText = `${data.monthName} 2026`;
+                document.getElementById('expectedVal').innerText = `₦${parseFloat(data.expected).toLocaleString()}`;
+                document.getElementById('collectedVal').innerText = `₦${parseFloat(data.collected).toLocaleString()}`;
+
+                if (data.expected > 0) {
+                    const percent = Math.min((data.collected / data.expected) * 100, 100).toFixed(1);
+                    document.getElementById('efficiencyBar').style.width = percent + '%';
+                    document.getElementById('efficiencyText').innerText = `${percent}% of expected revenue collected`;
+                } else {
+                    document.getElementById('efficiencyText').innerText = "No active leases to calculate expected revenue.";
+                }
+            } catch (err) {
+                console.error("Report failed to load", err);
+            }
+        }
+
+        function logout() {
+            document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.href = 'login.html';
+        }
+
+        window.onload = loadReport;
+    </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VirtuLease | Houses</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <h1>VirtuLease</h1>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="houses.html" class="active">Houses / Rooms</a>
+        <a href="tenants.html">Tenants</a>
+        <a href="reports.html">Reports</a>
+        <a href="payments.html">Payments</a>
+        <a href="notifications.html">Notifications</a>
+        <a href="profile.html">Profile</a>
+
+
+
+        <button class="logout" onclick="logout()">Logout</button>
+    </nav>
+    <main>
+        <div class="header">
+            <h2 id="formTitle">Manage Houses</h2>
+        </div>
+        <div class="card">
+            <h3 id="houseActionLabel">Add New Building</h3>
+            <form id="houseForm">
+                <input type="hidden" id="editHouseId">
+                <input type="text" id="name" placeholder="House Name" required>
+                <textarea id="address" placeholder="Full Address" required></textarea>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="primary" id="saveBtn">Save House</button>
+                    <button type="button" id="cancelEdit" class="hidden" onclick="resetHouseForm()" style="background:#95a5a6; color:white;">Cancel Edit</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>Your Properties</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Address</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="houseList"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        async function fetchHouses() {
+            const res = await fetch('/api/houses');
+            const houses = await res.json();
+            const list = document.getElementById('houseList');
+            list.innerHTML = houses.map(h => `
+                <tr>
+                    <td>${h.name}</td>
+                    <td>${h.address}</td>
+                    <td>
+                        <button onclick="viewRooms(${h.id})" class="success">Rooms</button>
+                        <button onclick="editHouse(${h.id}, '${h.name}', '${h.address}')" style="background:#f39c12; color:white;">Edit</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('houseForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editHouseId').value;
+            const data = {
+                name: document.getElementById('name').value,
+                address: document.getElementById('address').value
+            };
+            
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/houses/${id}` : '/api/houses';
+
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                resetHouseForm();
+                fetchHouses();
+            }
+        };
+
+        function editHouse(id, name, address) {
+            document.getElementById('editHouseId').value = id;
+            document.getElementById('name').value = name;
+            document.getElementById('address').value = address;
+            document.getElementById('houseActionLabel').innerText = "Edit Building Details";
+            document.getElementById('saveBtn').innerText = "Update House";
+            document.getElementById('cancelEdit').classList.remove('hidden');
+        }
+
+        function resetHouseForm() {
+            document.getElementById('houseForm').reset();
+            document.getElementById('editHouseId').value = '';
+            document.getElementById('houseActionLabel').innerText = "Add New Building";
+            document.getElementById('saveBtn').innerText = "Save House";
+            document.getElementById('cancelEdit').classList.add('hidden');
+        }
+
+        function viewRooms(id) { window.location.href = `rooms.html?houseId=${id}`; }
+        function logout() { document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; window.location.href = 'login.html'; }
+        
+        fetchHouses();
+    </script>
+</body>
+</html>

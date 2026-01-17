@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VirtuLease | Staff Profile</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <h1>VirtuLease</h1>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="houses.html">Houses / Rooms</a>
+        <a href="tenants.html">Tenants</a>
+        <a href="payments.html">Payments</a>
+        <a href="reports.html">Reports</a>
+        <a href="notifications.html">Notifications</a>
+
+        <a href="profile.html" class="active">Profile</a>
+        <button class="logout" onclick="logout()">Logout</button>
+    </nav>
+    <main>
+        <div class="header">
+            <h2>Account Settings</h2>
+        </div>
+
+        <div class="card" style="max-width: 600px;">
+            <form id="profileForm">
+                <label>Full Name</label>
+                <input type="text" id="profName" required>
+
+                <label>Email Address</label>
+                <input type="email" id="profEmail" required>
+
+                <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+                
+                <label>New Password (Leave blank to keep current)</label>
+                <input type="password" id="profPass" placeholder="••••••••">
+
+                <button type="submit" class="primary" style="margin-top: 20px;">Update Profile</button>
+            </form>
+            <div id="updateMsg" style="margin-top: 15px; display: none; color: var(--success); font-weight: bold;">
+                Changes saved successfully!
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function loadProfile() {
+            const res = await fetch('/api/profile');
+            const data = await res.json();
+            document.getElementById('profName').value = data.full_name;
+            document.getElementById('profEmail').value = data.email;
+        }
+
+        document.getElementById('profileForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const payload = {
+                full_name: document.getElementById('profName').value,
+                email: document.getElementById('profEmail').value,
+                password: document.getElementById('profPass').value
+            };
+
+            const res = await fetch('/api/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                document.getElementById('updateMsg').style.display = 'block';
+                document.getElementById('profPass').value = '';
+                setTimeout(() => document.getElementById('updateMsg').style.display = 'none', 3000);
+            }
+        };
+
+        function logout() {
+            document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.href = 'login.html';
+        }
+
+        window.onload = loadProfile;
+    </script>
+</body>
+</html>

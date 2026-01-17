@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VirtuLease | Room Management</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <h1>VirtuLease</h1>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="houses.html">Houses / Rooms</a>
+        <a href="tenants.html">Tenants</a>
+        <a href="reports.html">Reports</a>
+        <a href="payments.html">Payments</a>
+        <a href="notifications.html">Notifications</a>
+
+        <a href="profile.html">Profile</a>
+
+        <button class="logout" onclick="logout()">Logout</button>
+    </nav>
+    <main>
+        <div class="header">
+            <h2 id="houseName">Room Inventory</h2>
+            <button class="primary" onclick="window.location.href='houses.html'">← Back to Houses</button>
+        </div>
+
+        <div class="card">
+            <h3 id="roomActionLabel">Add New Room</h3>
+            <form id="roomForm" style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: end;">
+                <input type="hidden" id="editRoomId">
+                <div>
+                    <label>Room No.</label>
+                    <input type="text" id="roomNo" placeholder="e.g. A101" required style="margin:0;">
+                </div>
+                <div>
+                    <label>Room Type</label>
+                    <select id="roomType" style="margin:0;">
+                        <option value="Self-Contain">Self-Contain</option>
+                        <option value="Single Room">Single Room</option>
+                        <option value="Executive Suite">Executive Suite</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Annual Rent (₦)</label>
+                    <input type="number" id="rent" placeholder="250000" required style="margin:0;">
+                </div>
+                <div style="display: flex; gap: 5px;">
+                    <button type="submit" class="success" id="saveRoomBtn">Save</button>
+                    <button type="button" id="cancelRoomEdit" class="hidden" onclick="resetRoomForm()" style="background:#95a5a6; color:white;">Cancel</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>Building Units</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Room No.</th>
+                        <th>Type</th>
+                        <th>Annual Rent</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="roomList"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const houseId = urlParams.get('houseId');
+
+        if (!houseId) {
+            window.location.href = 'houses.html';
+        }
+
+        async function fetchRooms() {
+            const res = await fetch(`/api/rooms/${houseId}`);
+            const rooms = await res.json();
+            const list = document.getElementById('roomList');
+            list.innerHTML = rooms.map(r => `
+                <tr>
+                    <td><strong>${r.room_number}</strong></td>
+                    <td>${r.room_type}</td>
+                    <td>₦${parseFloat(r.base_rent).toLocaleString()}</td>
+                    <td><span class="status-badge status-${r.status}">${r.status}</span></td>
+                    <td>
+                        <button onclick="editRoom(${r.id}, '${r.room_number}', '${r.room_type}', ${r.base_rent})" style="background:#f39c12; color:white; padding: 5px 10px;">Edit</button>
+                        ${r.status === 'vacant' ? `<button onclick="deleteRoom(${r.id})" style="background:#e74c3c; color:white; padding: 5px 10px;">Delete</button>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('roomForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editRoomId').value;
+            const data = {
+                house_id: houseId,
+                room_number: document.getElementById('roomNo').value,
+                room_type: document.getElementById('roomType').value,
+                base_rent: document.getElementById('rent').value
+            };
+
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/rooms/${id}` : '/api/rooms';
+
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                resetRoomForm();
+                fetchRooms();
+            }
+        };
+
+        function editRoom(id, no, type, rent) {
+            document.getElementById('editRoomId').value = id;
+            document.getElementById('roomNo').value = no;
+            document.getElementById('roomType').value = type;
+            document.getElementById('rent').value = rent;
+            document.getElementById('roomActionLabel').innerText = "Edit Room Details";
+            document.getElementById('saveRoomBtn').innerText = "Update";
+            document.getElementById('cancelRoomEdit').classList.remove('hidden');
+        }
+
+        async function deleteRoom(id) {
+            if (!confirm("Are you sure? This action cannot be undone.")) return;
+            const res = await fetch(`/api/rooms/${id}`, { method: 'DELETE' });
+            if (res.ok) fetchRooms();
+            else alert("Cannot delete room. It might have lease history.");
+        }
+
+        function resetRoomForm() {
+            document.getElementById('roomForm').reset();
+            document.getElementById('editRoomId').value = '';
+            document.getElementById('roomActionLabel').innerText = "Add New Room";
+            document.getElementById('saveRoomBtn').innerText = "Save";
+            document.getElementById('cancelRoomEdit').classList.add('hidden');
+        }
+
+        function logout() { document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; window.location.href = 'login.html'; }
+        
+        fetchRooms();
+    </script>
+</body>
+</html>
