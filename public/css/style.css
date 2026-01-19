@@ -33,7 +33,7 @@ body {
 /* --- Navigation Sidebar --- */
 nav {
     width: 260px;
-    background: #0f172a; /* Dark Navy */
+    background: #0f172a; 
     color: white;
     padding: 2rem 1.5rem;
     display: flex;
